@@ -1,0 +1,510 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Rôles et statuts
+// ---------------------------------------------------------------------------
+
+enum Role {
+  CANDIDATE
+  ORGANIZER
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContestStatus {
+  DRAFT
+  PUBLISHED
+  REGISTRATION_CLOSED
+  VOTING_CLOSED
+  RESULTS_PUBLISHED
+  ARCHIVED
+}
+
+enum CandidateType {
+  INDIVIDUAL
+  TEAM
+}
+
+enum CandidateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  DISQUALIFIED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum MediaStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+enum PaymentProvider {
+  MANUAL
+  MTN_MOMO
+  MOOV_MONEY
+  FEDAPAY
+  KKIAY
+  CINETPAY
+  MOCK
+}
+
+enum PaymentPurpose {
+  REGISTRATION
+  VOTE
+}
+
+enum PaymentStatus {
+  PENDING
+  AWAITING_CONFIRMATION
+  SUCCESS
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum VoteOrderStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Comptes et authentification (compatible Auth.js)
+// ---------------------------------------------------------------------------
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  phone           String?   @unique
+  passwordHash    String
+  role            Role      @default(CANDIDATE)
+  locale          String    @default("fr")
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  organizedEvents    Event[]           @relation("EventOrganizer")
+  candidates         Candidate[]       @relation("CandidateOwner")
+  approvedCandidates Candidate[]       @relation("CandidateApprover")
+  uploadedMedia      Media[]           @relation("MediaUploader")
+  verifiedPayments   Payment[]         @relation("PaymentVerifier")
+  auditLogs          AuditLog[]        @relation("AuditActor")
+  notifications      NotificationLog[]
+
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Événement, domaines et concours
+// ---------------------------------------------------------------------------
+
+model Event {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  title       String
+  description String      @db.Text
+  coverUrl    String?
+  status      EventStatus @default(DRAFT)
+  organizerId String
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  organizer User      @relation("EventOrganizer", fields: [organizerId], references: [id], onDelete: Restrict)
+  contests  Contest[]
+
+  @@index([status])
+}
+
+model Domain {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+  icon        String?
+  sortOrder   Int     @default(0)
+
+  contests Contest[]
+}
+
+model Contest {
+  id                  String        @id @default(cuid())
+  eventId             String
+  domainId            String
+  slug                String        @unique
+  title               String
+  description         String        @db.Text
+  rules               String        @db.Text
+  status              ContestStatus @default(DRAFT)
+  currency            String        @default("XOF")
+  registrationFee     Int           @default(0)
+  voteUnitPrice       Int           @default(100)
+  registrationOpenAt  DateTime
+  registrationCloseAt DateTime
+  votingOpenAt        DateTime
+  votingCloseAt       DateTime
+  resultsAt           DateTime?
+  coverUrl            String?
+  maxCandidates       Int?
+  publishedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  event      Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  domain     Domain          @relation(fields: [domainId], references: [id], onDelete: Restrict)
+  candidates Candidate[]
+  results    ContestResult[]
+  media      Media[]
+
+  @@index([eventId])
+  @@index([domainId])
+  @@index([status, votingCloseAt])
+}
+
+// ---------------------------------------------------------------------------
+// Candidats et équipes
+// ---------------------------------------------------------------------------
+
+model Candidate {
+  id                     String          @id @default(cuid())
+  contestId              String
+  ownerId                String?
+  type                   CandidateType   @default(INDIVIDUAL)
+  displayName            String
+  slug                   String          @unique
+  bio                    String?         @db.Text
+  birthDate              DateTime
+  isMinor                Boolean         @default(false)
+  guardianName           String?
+  guardianPhoneEncrypted String?
+  guardianEmailEncrypted String?
+  guardianConsentMediaId String?
+  status                 CandidateStatus @default(DRAFT)
+  rejectionReason        String?
+  votesCount             Int             @default(0)
+  registrationPaymentId  String?         @unique
+  submittedAt            DateTime?
+  approvedAt             DateTime?
+  approvedById           String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  contest              Contest         @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  owner                User?           @relation("CandidateOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  approvedBy           User?           @relation("CandidateApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  registrationPayment  Payment?        @relation("RegistrationPayment", fields: [registrationPaymentId], references: [id], onDelete: SetNull)
+  payments             Payment[]       @relation("CandidatePayments")
+  guardianConsentMedia Media?          @relation("CandidateGuardianConsent", fields: [guardianConsentMediaId], references: [id], onDelete: SetNull)
+  teamMembers          TeamMember[]
+  media                Media[]
+  votes                Vote[]
+  voteOrders           VoteOrder[]
+  results              ContestResult[]
+
+  @@index([contestId, status, votesCount])
+  @@index([ownerId])
+}
+
+model TeamMember {
+  id                     String    @id @default(cuid())
+  candidateId            String
+  fullName               String
+  birthDate              DateTime?
+  isMinor                Boolean   @default(false)
+  role                   String?
+  guardianName           String?
+  guardianPhoneEncrypted String?
+  guardianConsentUrl     String?
+  createdAt              DateTime  @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+// ---------------------------------------------------------------------------
+// Médias
+// ---------------------------------------------------------------------------
+
+model Media {
+  id              String      @id @default(cuid())
+  uploaderId      String?
+  candidateId     String?
+  contestId       String?
+  type            MediaType
+  status          MediaStatus @default(PENDING)
+  storageKey      String      @unique
+  url             String?
+  mimeType        String
+  sizeBytes       Int
+  width           Int?
+  height          Int?
+  durationSeconds Int?
+  checksum        String?
+  createdAt       DateTime    @default(now())
+
+  uploader         User?       @relation("MediaUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+  candidate        Candidate?  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  contest          Contest?    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  guardianConsents Candidate[] @relation("CandidateGuardianConsent")
+
+  @@index([candidateId])
+  @@index([contestId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Paiements, votes et reçus
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id                    String          @id @default(cuid())
+  reference             String          @unique
+  provider              PaymentProvider @default(MANUAL)
+  providerTransactionId String?
+  declaredTransactionId String?
+  purpose               PaymentPurpose
+  status                PaymentStatus   @default(PENDING)
+  amount                Int
+  currency              String          @default("XOF")
+  payerName             String
+  payerPhone            String
+  payerEmail            String?
+  candidateId           String?
+  proofMediaId          String?
+  metadata              Json?
+  idempotencyKey        String?         @unique
+  failureReason         String?
+  submittedAt           DateTime?
+  verifiedAt            DateTime?
+  verifiedById          String?
+  paidAt                DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  candidate       Candidate?        @relation("CandidatePayments", fields: [candidateId], references: [id], onDelete: SetNull)
+  registrationFor Candidate?        @relation("RegistrationPayment")
+  verifiedBy      User?             @relation("PaymentVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  voteOrder       VoteOrder?
+  receipt         Receipt?
+  notifications   NotificationLog[]
+
+  @@index([status, purpose])
+  @@index([candidateId])
+  @@index([createdAt])
+}
+
+model VoteOrder {
+  id          String          @id @default(cuid())
+  candidateId String
+  paymentId   String          @unique
+  quantity    Int
+  unitPrice   Int
+  amount      Int
+  status      VoteOrderStatus @default(PENDING)
+  ipHash      String?
+  deviceHash  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  payment   Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  votes     Vote[]
+
+  @@index([candidateId, status])
+  @@index([createdAt])
+}
+
+model Vote {
+  id            String   @id @default(cuid())
+  candidateId   String
+  voteOrderId   String
+  quantity      Int      @default(1)
+  unitPrice     Int
+  amount        Int
+  ipHash        String?
+  deviceHash    String?
+  userAgentHash String?
+  createdAt     DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  voteOrder VoteOrder @relation(fields: [voteOrderId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, createdAt])
+  @@index([voteOrderId])
+}
+
+model Receipt {
+  id          String    @id @default(cuid())
+  number      String    @unique
+  paymentId   String    @unique
+  pdfKey      String?
+  issuedAt    DateTime  @default(now())
+  emailSentAt DateTime?
+  smsSentAt   DateTime?
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model ContestResult {
+  id          String    @id @default(cuid())
+  contestId   String
+  candidateId String
+  rank        Int
+  votes       Int
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  contest   Contest   @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, candidateId])
+  @@unique([contestId, rank])
+  @@index([contestId, votes])
+}
+
+// ---------------------------------------------------------------------------
+// Audit, webhooks et notifications
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  ipHash     String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model WebhookEvent {
+  id          String        @id @default(cuid())
+  provider    String
+  externalId  String
+  eventType   String
+  payload     Json
+  status      WebhookStatus @default(RECEIVED)
+  error       String?
+  receivedAt  DateTime      @default(now())
+  processedAt DateTime?
+
+  @@unique([provider, externalId])
+  @@index([status])
+}
+
+model NotificationLog {
+  id          String              @id @default(cuid())
+  userId      String?
+  paymentId   String?
+  channel     NotificationChannel
+  recipient   String
+  template    String
+  status      NotificationStatus  @default(PENDING)
+  providerRef String?
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime            @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
