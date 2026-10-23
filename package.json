@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "format": "prisma format",
-    "db:push": "prisma db push",
+    "db:push": "node scripts/with-db.mjs \"prisma db push\"",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "db:seed": "node scripts/with-db.mjs \"tsx prisma/seed.ts\"",
+    "db:studio": "node scripts/with-db.mjs \"prisma studio\"",
+    "postinstall": "prisma generate",
+    "db:start": "node scripts/db-start.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -35,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "prisma": "^6.19.3",

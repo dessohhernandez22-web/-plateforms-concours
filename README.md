@@ -1,34 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SPP TALENT SHOWDOWN — Plateforme de concours
 
-## Getting Started
+Plateforme web mobile-first de gestion de concours artisanaux et sportifs pour le marché béninois (FCFA) : inscriptions, dépôt de photos/vidéos, autorisation parentale des mineurs, paiement Mobile Money, votes payants, reçus, exports et administration.
 
-First, run the development server:
+## Démarrage rapide
 
 ```bash
+npm install
+npm run db:push
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Le script `npm run dev` démarre automatiquement une base **PostgreSQL embarquée** (sans installation système) dans `.data/postgres`, puis Next.js sur <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> Pour utiliser une base externe (Neon, Supabase, PostgreSQL local), modifiez `DATABASE_URL` dans `.env` puis lancez `npm run db:push && npm run db:seed`.
 
-## Learn More
+## Comptes de démonstration
 
-To learn more about Next.js, take a look at the following resources:
+| Rôle | E-mail | Mot de passe |
+|---|---|---|
+| Administrateur | `admin@spp.bj` | `Admin@2026` |
+| Organisateur | `organisateur@spp.bj` | `Organisateur@2026` |
+| Candidat | `candidat@spp.bj` | `Candidat@2026` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Commande | Description |
+|---|---|
+| `npm run dev` | Démarre PostgreSQL embarqué + Next.js |
+| `npm run db:start` | Démarre uniquement PostgreSQL embarqué |
+| `npm run db:push` | Synchronise le schéma Prisma |
+| `npm run db:seed` | Charge les 9 domaines, concours et candidats de démo |
+| `npm run db:studio` | Ouvre Prisma Studio |
+| `npm run typecheck` | Vérifie TypeScript |
+| `npm run lint` | Vérifie ESLint |
+| `npm run build` | Build de production |
 
-## Deploy on Vercel
+## Domaines du concours
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Musique · Danse · Arts culinaires · Arts visuels · Arts cinématographiques · Mode · Technologie · Football · Génie en herbe.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Stack
+
+- Next.js 16 (App Router) + TypeScript + Tailwind CSS 4
+- PostgreSQL + Prisma
+- Auth.js v5 + Argon2id
+- Prisma Studio, Zod, Lucide
+
+## Paiements
+
+Architecture prévue avec une interface fournisseur unique :
+
+- `MANUAL` : Mobile Money manuel vérifié par l'administration (aucun agrégateur requis) ;
+- `MTN_MOMO` / `MOOV_MONEY` : API directes (à activer avec un compte marchand) ;
+- `FEDAPAY` / `KKIAY` / `CINETPAY` : adaptateurs optionnels.
+
+Aucun montant n'est accepté depuis le client : il est toujours recalculé côté serveur.
+
+## Statut
+
+- [x] M0 — Fondations, schéma de données, seed SPP
+- [x] M1 — Authentification, rôles, pages publiques de base
+- [ ] M2 — Pages publiques complètes (calendrier, filtres)
+- [ ] M3 — Inscriptions candidats/équipes + médias + mineurs
+- [ ] M4 — Paiements et reçus
+- [ ] M5 — Votes payants et anti-abus
+- [ ] M6 — Back-office et exports
+- [ ] M7 — Notifications, i18n, RGPD
+- [ ] M8 — Tests, déploiement
