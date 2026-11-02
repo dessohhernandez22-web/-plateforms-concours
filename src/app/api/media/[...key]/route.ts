@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
-import { readUpload } from "@/lib/storage";
+import { getBlobReadWriteToken, readUpload } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -59,9 +59,9 @@ export async function GET(
       });
     }
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    const token = getBlobReadWriteToken(media.isPublic);
     if (!token) {
-      return new NextResponse("Stockage non configuré", { status: 503 });
+      return new NextResponse("Store Blob non configuré", { status: 503 });
     }
 
     const result = await get(media.storageKey, {

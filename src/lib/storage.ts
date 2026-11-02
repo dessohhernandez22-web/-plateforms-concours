@@ -39,6 +39,12 @@ export type StoredUpload = {
   checksum: string;
 };
 
+export function getBlobReadWriteToken(isPublic: boolean): string | undefined {
+  return isPublic
+    ? process.env.BLOB_PUBLIC_READ_WRITE_TOKEN
+    : process.env.BLOB_PRIVATE_READ_WRITE_TOKEN;
+}
+
 export function hasMagicBytes(buffer: Buffer, mimeType: string): boolean {
   switch (mimeType) {
     case "image/jpeg":

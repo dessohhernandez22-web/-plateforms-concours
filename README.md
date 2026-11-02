@@ -92,7 +92,7 @@ Copiez `.env.example` vers `.env` puis renseignez les valeurs :
 - `PII_ENCRYPTION_KEY` (32 caractères minimum, obligatoire en production)
 - `RATE_LIMIT_SECRET`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`
-- `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_UPLOAD_MODE` (`local` ou `blob`)
+- `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`, `NEXT_PUBLIC_UPLOAD_MODE` (`local` ou `blob`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
 - `SASPAY_API_KEY`, `SASPAY_WEBHOOK_SECRET`, `SASPAY_WEBHOOK_URL`
 - `CRON_SECRET`
@@ -108,24 +108,25 @@ Le projet est prévu pour **Vercel + Neon (PostgreSQL) + Vercel Blob**.
 1. Créez une base Neon :
    - `DATABASE_URL` : URL **pooled** (avec `-pooler`) pour l'exécution ;
    - `DIRECT_URL` : URL **directe** (sans `-pooler`) pour les migrations.
-2. Ajoutez un store **Blob** et les variables d'environnement ci-dessus.
+2. Créez deux stores **Blob** et connectez-les au projet en Production : un store public pour les photos/vidéos des candidatures, et un store privé pour les preuves de paiement et autorisations parentales. Dans les options avancées, utilisez les préfixes `BLOB_PUBLIC` et `BLOB_PRIVATE` pour obtenir `BLOB_PUBLIC_READ_WRITE_TOKEN` et `BLOB_PRIVATE_READ_WRITE_TOKEN`.
 3. Déployez. `vercel-build` exécute `prisma generate`, `prisma migrate deploy` puis `next build`.
 4. Créez le premier administrateur : définissez `ADMIN_EMAIL` / `ADMIN_PASSWORD` puis exécutez `npm run db:seed:remote` une seule fois.
 5. Vérifiez le déploiement : `GET /api/health` doit répondre `{"status":"ok","database":"up"}`.
 
-> Le cron Vercel appelle `/api/cron/contest-lifecycle` toutes les 15 minutes et exige `CRON_SECRET`.
-> En production, `NEXT_PUBLIC_UPLOAD_MODE="blob"` : l'envoi local est refusé et les vidéos jusqu'à 500 Mo passent directement par Vercel Blob.
+> GitHub Actions appelle `/api/cron/contest-lifecycle` toutes les 15 minutes. Ajoutez `CRON_SECRET` dans **Settings → Secrets and variables → Actions** du dépôt GitHub avec la même valeur que celle configurée dans Vercel. Le workflow peut aussi être lancé manuellement depuis l'onglet **Actions**.
+> En production, `NEXT_PUBLIC_UPLOAD_MODE="blob"` : l'envoi local est refusé et les vidéos jusqu'à 500 Mo passent directement par le store Blob public. Les documents sensibles utilisent le store privé et ne sont servis qu'après contrôle d'accès.
 > Le stockage local (`.data/uploads`) reste réservé au développement.
 
 ### Checklist avant mise en ligne
 
 1. `NEXT_PUBLIC_APP_URL` et `NEXTAUTH_URL` pointent vers le domaine HTTPS définitif.
 2. `AUTH_SECRET`, `NEXTAUTH_SECRET`, `PII_ENCRYPTION_KEY`, `RATE_LIMIT_SECRET` et `CRON_SECRET` sont des valeurs aléatoires distinctes.
-3. `NEXT_PUBLIC_UPLOAD_MODE="blob"` et `BLOB_READ_WRITE_TOKEN` est configuré.
-4. Les identifiants SMTP et Saspay sont renseignés, et `SASPAY_WEBHOOK_URL` pointe vers `/api/saspay/callback`.
-5. `npm run typecheck && npm run lint && npm test && npm run build` passe sans erreur.
-6. Le compte administrateur est créé et les concours sont publiés depuis **Administration → Concours**.
-7. Le sitemap (`/sitemap.xml`), le robots (`/robots.txt`) et l'image de partage (`/opengraph-image`) sont accessibles.
+3. `NEXT_PUBLIC_UPLOAD_MODE="blob"` et les deux tokens `BLOB_PUBLIC_READ_WRITE_TOKEN` / `BLOB_PRIVATE_READ_WRITE_TOKEN` sont configurés.
+4. Le secret Actions `CRON_SECRET` est identique à celui de Vercel pour activer le workflow planifié.
+5. Les identifiants SMTP et Saspay sont renseignés, et `SASPAY_WEBHOOK_URL` pointe vers `/api/saspay/callback`.
+6. `npm run typecheck && npm run lint && npm test && npm run build` passe sans erreur.
+7. Le compte administrateur est créé et les concours sont publiés depuis **Administration → Concours**.
+8. Le sitemap (`/sitemap.xml`), le robots (`/robots.txt`) et l'image de partage (`/opengraph-image`) sont accessibles.
 
 ### Reprise d'une base existante
 

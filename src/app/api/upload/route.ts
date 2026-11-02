@@ -14,7 +14,7 @@ import {
 import { prisma } from "@/lib/db";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import { getCurrentUser } from "@/lib/session";
-import { saveUpload, UploadError } from "@/lib/storage";
+import { getBlobReadWriteToken, saveUpload, UploadError } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -85,18 +85,39 @@ function uploadRules(payload: ClientPayload) {
 }
 
 async function handleBlobUpload(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  const body = (await request.json()) as HandleUploadBody;
+  let isPublic: boolean;
+
+  try {
+    if (body.type === "blob.generate-client-token") {
+      const payload = parseClientPayload(body.payload.clientPayload);
+      isPublic = !uploadRules(payload).isPrivateDocument;
+    } else {
+      const media = await prisma.media.findUnique({
+        where: { storageKey: body.payload.blob.pathname },
+        select: { isPublic: true },
+      });
+      if (!media) {
+        return NextResponse.json({ error: "Fichier introuvable." }, { status: 404 });
+      }
+      isPublic = media.isPublic;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Métadonnées d'envoi invalides.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  const token = getBlobReadWriteToken(isPublic);
+  if (!token) {
     return NextResponse.json(
-      { error: "Stockage Blob non configuré." },
+      { error: "Le store Blob correspondant à ce fichier n'est pas configuré." },
       { status: 503 },
     );
   }
 
-  const body = (await request.json()) as HandleUploadBody;
-
   try {
     const jsonResponse = await handleUpload({
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token,
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
