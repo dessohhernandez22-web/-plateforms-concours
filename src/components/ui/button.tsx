@@ -1,5 +1,11 @@
 import { cn } from "@/lib/utils";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ButtonHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
@@ -40,6 +46,12 @@ export function Button({
   const classes = cn(base, variants[variant], sizes[size], fullWidth && "w-full", className);
 
   if (asChild) {
+    if (isValidElement(children)) {
+      const child = children as ReactElement<{ className?: string }>;
+      return cloneElement(child, {
+        className: cn(classes, child.props.className),
+      });
+    }
     return <span className={classes}>{children}</span>;
   }
 

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,7 @@ enum MediaStatus {
 }
 
 enum PaymentProvider {
+  SASPAY
   MANUAL
   MTN_MOMO
   MOOV_MONEY
@@ -124,17 +126,31 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  accounts           Account[]
-  sessions           Session[]
-  organizedEvents    Event[]           @relation("EventOrganizer")
-  candidates         Candidate[]       @relation("CandidateOwner")
-  approvedCandidates Candidate[]       @relation("CandidateApprover")
-  uploadedMedia      Media[]           @relation("MediaUploader")
-  verifiedPayments   Payment[]         @relation("PaymentVerifier")
-  auditLogs          AuditLog[]        @relation("AuditActor")
-  notifications      NotificationLog[]
+  accounts            Account[]
+  sessions            Session[]
+  organizedEvents     Event[]              @relation("EventOrganizer")
+  candidates          Candidate[]          @relation("CandidateOwner")
+  approvedCandidates  Candidate[]          @relation("CandidateApprover")
+  uploadedMedia       Media[]              @relation("MediaUploader")
+  verifiedPayments    Payment[]            @relation("PaymentVerifier")
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  notifications       NotificationLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([role])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -318,6 +334,9 @@ model Media {
   status          MediaStatus @default(PENDING)
   storageKey      String      @unique
   url             String?
+  originalName    String?
+  label           String?
+  isPublic        Boolean     @default(true)
   mimeType        String
   sizeBytes       Int
   width           Int?
@@ -330,6 +349,7 @@ model Media {
   candidate        Candidate?  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   contest          Contest?    @relation(fields: [contestId], references: [id], onDelete: Cascade)
   guardianConsents Candidate[] @relation("CandidateGuardianConsent")
+  paymentProofs    Payment[]   @relation("PaymentProof")
 
   @@index([candidateId])
   @@index([contestId])
@@ -368,6 +388,7 @@ model Payment {
   candidate       Candidate?        @relation("CandidatePayments", fields: [candidateId], references: [id], onDelete: SetNull)
   registrationFor Candidate?        @relation("RegistrationPayment")
   verifiedBy      User?             @relation("PaymentVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  proofMedia      Media?            @relation("PaymentProof", fields: [proofMediaId], references: [id], onDelete: SetNull)
   voteOrder       VoteOrder?
   receipt         Receipt?
   notifications   NotificationLog[]
@@ -507,4 +528,13 @@ model Setting {
   key       String   @unique
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
 }

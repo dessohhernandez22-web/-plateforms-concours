@@ -39,6 +39,24 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   return DATETIME.format(new Date(date));
 }
 
+const DATETIME_LOCAL = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Africa/Porto-Novo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+export function toDateTimeLocal(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const parts = DATETIME_LOCAL.formatToParts(new Date(date));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
 export function ageFrom(birthDate: Date | string): number {
   const d = new Date(birthDate);
   const now = new Date();

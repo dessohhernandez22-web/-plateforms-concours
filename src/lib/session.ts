@@ -4,14 +4,25 @@ import { redirect } from "next/navigation";
 import type { Role } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export const getSession = cache(async () => auth());
 
-export async function requireUser() {
+export const getCurrentUser = cache(async () => {
   const session = await auth();
-  if (!session?.user) redirect("/connexion");
-  return session.user;
-}
+  if (!session?.user?.id) return null;
+
+  return prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, name: true, email: true, phone: true, role: true },
+  });
+});
+
+export const requireUser = cache(async () => {
+  const user = await getCurrentUser();
+  if (!user) redirect("/connexion");
+  return user;
+});
 
 export async function requireRole(...roles: Role[]) {
   const user = await requireUser();

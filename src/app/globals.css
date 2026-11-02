@@ -24,13 +24,41 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    background: #f5f7f4;
   }
+
   body {
     font-family: var(--font-sans);
+    background: linear-gradient(180deg, #f5f7f4 0%, #ffffff 48%, #f5f7f4 100%);
+    color: #17231e;
   }
+
+  ::selection {
+    background: rgba(180, 83, 9, 0.22);
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-clay-600);
     outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .premium-card {
+    @apply rounded-lg border border-stone-200/80 bg-white shadow-[0_16px_40px_-30px_rgba(19,47,38,0.35)];
+  }
+
+  .font-editorial {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  }
+
+  .hero-pattern {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: linear-gradient(90deg, transparent, black 48%, black);
   }
 }
 

@@ -18,9 +18,15 @@ export async function generateMetadata({
   const { slug } = await params;
   const candidate = await prisma.candidate.findUnique({
     where: { slug },
-    select: { displayName: true },
+    select: { displayName: true, bio: true, contest: { select: { title: true } } },
   });
-  return { title: candidate ? candidate.displayName : "Candidat introuvable" };
+  if (!candidate) return { title: "Candidat introuvable" };
+  return {
+    title: candidate.displayName,
+    description:
+      candidate.bio?.slice(0, 160) ??
+      `Découvrez la candidature de ${candidate.displayName} au concours ${candidate.contest.title}.`,
+  };
 }
 
 export default async function CandidatePage({ params }: { params: Promise<Params> }) {

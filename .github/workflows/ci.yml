@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      AUTH_SECRET: ci-only-auth-secret-with-enough-length
+      NEXTAUTH_SECRET: ci-only-auth-secret-with-enough-length
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      PII_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+      RATE_LIMIT_SECRET: ci-only-rate-limit-secret
+      ADMIN_EMAIL: admin@ci.example
+      ADMIN_PASSWORD: ci-admin-password-123
+      ADMIN_NAME: CI Admin
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate:deploy
+      - run: npm run db:seed:remote
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

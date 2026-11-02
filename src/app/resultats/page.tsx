@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Résultats" };
+export const metadata: Metadata = {
+  title: "Résultats",
+  description: "Consultez les classements officiels publiés par l'organisation.",
+};
 export const dynamic = "force-dynamic";
 
 export default async function ResultsPage() {

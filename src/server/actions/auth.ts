@@ -1,10 +1,13 @@
 "use server";
 
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 
 import { signIn, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { clientAddressKey, enforceRateLimit, rateLimitMessage } from "@/lib/rate-limit";
 import { loginSchema, registerSchema } from "@/lib/validations/auth";
 import type { AuthActionState } from "@/lib/validations/auth-state";
 
@@ -18,7 +21,7 @@ export async function registerAction(
     phone: formData.get("phone"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
-    role: formData.get("role") ?? "CANDIDATE",
+    role: "CANDIDATE",
     acceptTerms: formData.get("acceptTerms") === "on",
   });
 
@@ -28,6 +31,13 @@ export async function registerAction(
       message: "Veuillez corriger les erreurs ci-dessous.",
       errors: parsed.error.flatten().fieldErrors,
     };
+  }
+
+  const requestHeaders = await headers();
+  const ip = clientAddressKey(requestHeaders);
+  const ipLimit = await enforceRateLimit(`register:ip:${ip}`, 5, 60 * 60);
+  if (!ipLimit.ok) {
+    return { ok: false, message: rateLimitMessage(ipLimit.retryAfterSeconds) };
   }
 
   const existing = await prisma.user.findFirst({
@@ -56,14 +66,25 @@ export async function registerAction(
     },
   });
 
-  const redirectTo = parsed.data.role === "ORGANIZER" ? "/organisateur" : "/compte";
+  const redirectTo = "/compte";
 
   try {
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
       redirectTo,
+      callbackUrl: redirectTo,
+      redirect: false,
     });
+
+    if (result?.error) {
+      return {
+        ok: false,
+        message: "Impossible de créer la session.",
+      };
+    }
+
+    redirect(redirectTo);
   } catch (error) {
     if (error instanceof AuthError) {
       return { ok: true, message: "Compte créé. Connectez-vous." };
@@ -91,12 +112,44 @@ export async function loginAction(
     };
   }
 
+  const requestHeaders = await headers();
+  const ip = clientAddressKey(requestHeaders);
+  const [ipLimit, loginLimit] = await Promise.all([
+    enforceRateLimit(`login:ip:${ip}`, 30, 5 * 60),
+    enforceRateLimit(`login:${ip}:${parsed.data.email.toLowerCase()}`, 10, 5 * 60),
+  ]);
+  if (!ipLimit.ok || !loginLimit.ok) {
+    const retryAfter = !ipLimit.ok
+      ? ipLimit.retryAfterSeconds
+      : !loginLimit.ok
+        ? loginLimit.retryAfterSeconds
+        : 0;
+    return { ok: false, message: rateLimitMessage(retryAfter) };
+  }
+
+  const requestedNext = String(formData.get("next") ?? "");
+  const redirectTo =
+    requestedNext.startsWith("/") && !requestedNext.startsWith("//")
+      ? requestedNext
+      : "/compte";
+
   try {
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: "/compte",
+      redirectTo,
+      callbackUrl: redirectTo,
+      redirect: false,
     });
+
+    if (result?.error) {
+      return {
+        ok: false,
+        message: "E-mail ou mot de passe incorrect.",
+      };
+    }
+
+    redirect(redirectTo);
   } catch (error) {
     if (error instanceof AuthError) {
       return { ok: false, message: "E-mail ou mot de passe incorrect." };

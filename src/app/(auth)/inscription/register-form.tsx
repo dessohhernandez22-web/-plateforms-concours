@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,16 +40,6 @@ export function RegisterForm() {
         error={state.errors?.phone}
       />
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="role" className="text-sm font-medium text-stone-800">
-          Je m&apos;inscris comme
-        </label>
-        <select id="role" name="role" defaultValue="CANDIDATE" className={fieldClass}>
-          <option value="CANDIDATE">Candidat / Équipe</option>
-          <option value="ORGANIZER">Organisateur</option>
-        </select>
-      </div>
-
       <Field
         name="password"
         label="Mot de passe"
@@ -66,8 +57,25 @@ export function RegisterForm() {
       <label className="flex items-start gap-2 text-sm text-stone-700">
         <input type="checkbox" name="acceptTerms" className="mt-1 size-4 accent-clay-600" />
         <span>
-          J&apos;accepte les conditions d&apos;utilisation et la politique de
-          confidentialité, y compris pour les candidats mineurs.
+          J&apos;accepte les{" "}
+          <Link
+            href="/conditions-utilisation"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-clay-700 underline"
+          >
+            conditions d&apos;utilisation
+          </Link>{" "}
+          et la{" "}
+          <Link
+            href="/confidentialite"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-clay-700 underline"
+          >
+            politique de confidentialité
+          </Link>
+          {", y compris pour les candidats mineurs."}
         </span>
       </label>
       {state.errors?.acceptTerms && (

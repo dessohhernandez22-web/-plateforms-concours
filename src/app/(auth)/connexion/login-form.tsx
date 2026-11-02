@@ -10,7 +10,7 @@ import {
   type AuthActionState,
 } from "@/lib/validations/auth-state";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     loginAction,
     initialAuthState,
@@ -18,6 +18,7 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
+      <input type="hidden" name="next" value={next ?? ""} />
       {state.message && (
         <p
           role="alert"

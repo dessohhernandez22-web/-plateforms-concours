@@ -31,9 +31,14 @@ export default async function AccountPage() {
 
       <div className="flex flex-wrap gap-3">
         {user.role === "CANDIDATE" && (
-          <Button asChild>
-            <Link href="/concours">Voir les concours</Link>
-          </Button>
+          <>
+            <Button asChild>
+              <Link href="/compte/candidatures">Mes candidatures</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/concours">Voir les concours</Link>
+            </Button>
+          </>
         )}
         {(user.role === "ORGANIZER" || user.role === "ADMIN") && (
           <Button asChild>

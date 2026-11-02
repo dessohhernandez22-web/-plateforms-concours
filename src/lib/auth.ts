@@ -12,11 +12,13 @@ declare module "next-auth" {
     user: {
       id: string;
       role: Role;
+      phone?: string | null;
     } & DefaultSession["user"];
   }
 
   interface User {
     role?: Role;
+    phone?: string | null;
   }
 }
 
@@ -56,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
+          phone: user.phone,
         };
       },
     }),
@@ -65,12 +68,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user.role ?? "CANDIDATE") as Role;
+        token.phone = user.phone ?? null;
       }
       return token;
     },
     session({ session, token }) {
       if (token.id) session.user.id = token.id as string;
       if (token.role) session.user.role = token.role as Role;
+      if (token.phone) session.user.phone = token.phone as string | null;
       return session;
     },
   },
